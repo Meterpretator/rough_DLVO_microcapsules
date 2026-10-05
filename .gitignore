@@ -1,9 +1,15 @@
+# Игнорировать всё в корне
+/*
+# Но оставить эти папки
+!ACF/
+!DLVO_CALC/
+!WhiteNoise/
+!grids/
+!.gitignore
+
+# Стандартный мусор
 venv/
 .venv/
 __pycache__/
 *.pyc
 .idea/
-.env
-*.log
-data/
-output/

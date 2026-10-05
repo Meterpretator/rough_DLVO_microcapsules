@@ -12,22 +12,31 @@ from generate_surface.WhiteNoise.white_noise_field_generator import (
 скрипт расчета взаимодействия шерх. поверхн. с плоской.
 
 '''
-# ============================================================
-# КОНСТАНТЫ
-# ============================================================
-k_B = 1.380649e-23  # Дж/К
-e = 1.602176634e-19  # Кл
-T_default = 298.0  # К
-epsilon_0 = 8.854187817e-12  # Ф/м
-epsilon_r = 78.5  # относительная диэлектрическая проницаемость воды
-N_A = 6.02214076e23  # 1/моль
+# # ============================================================
+# # КОНСТАНТЫ
+# # ============================================================
+# k_B = 1.380649e-23  # Дж/К
+# e = 1.602176634e-19  # Кл
+# T_default = 298.0  # К
+# epsilon_0 = 8.854187817e-12  # Ф/м
+# epsilon_r = 78.5  # относительная диэлектрическая проницаемость воды
+# N_A = 6.02214076e23  # 1/моль
 
+from generate_surface.DLVO_CALC.dlvo_params import (
+    k_B, e, epsilon_0, N_A,
+    T, epsilon_r,
+    A_H, zeta1, zeta2, ionic_strength, d_min,
+    N, Lx, Ly, sigma_f, xi, H0, seed,
+    H0_min, H0_max, H0_n_points,
+    SUPTITLE_Y, SUPTITLE_SIZE, RECT_TOP, FIG_WIDTH, FIG_HEIGHT,
+    get_derived_params, print_params,
+)
 
 # ============================================================
 # 1. ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ DLVO
 # ============================================================
 
-def compute_kappa(ionic_strength, T=T_default):
+def compute_kappa(ionic_strength, T):
     """
     Вычисляет обратную дебаевскую длину κ [1/м].
 
@@ -39,14 +48,14 @@ def compute_kappa(ionic_strength, T=T_default):
     return kappa, 1.0 / kappa
 
 
-def compute_gamma(zeta_potential, T=T_default):
+def compute_gamma(zeta_potential, T):
     """Вычисляет параметр gamma = tanh(e ζ / (4 k_B T))."""
     return np.tanh((e * zeta_potential) / (4 * k_B * T))
 
 
 def compute_ion_density(ionic_strength):
     """Концентрация ионов [1/м³] для симметричного 1:1 электролита."""
-    return  N_A * ionic_strength # я умножал на 2 это ошибка
+    return  2 * N_A * ionic_strength # нужна ли тут 2??
 
 
 # ============================================================
@@ -215,28 +224,28 @@ def check_smooth_surface(field_shape, dx, dy, H0, A_H, kappa, gamma1, gamma2, n0
 # ============================================================
 
 def main():
-    # ------------------------------------------------------------
-    # 3.1 ПАРАМЕТРЫ ГЕНЕРАЦИИ ПОЛЯ
-    # ------------------------------------------------------------
-    N = 1024
-    Lx, Ly = 1e-6, 1e-6  # 1 мкм × 1 мкм
-    sigma_f = 2e-9  # 2 нм (амплитуда шероховатости)
-    xi = 1e-8  # 10 нм (корреляционная длина)
-    H0 = 10e-9  # 10 нм (среднее расстояние)
-    seed = np.random.seed()  # генерация рандомной
-    # ------------------------------------------------------------
-    # 3.2 ФИЗИЧЕСКИЕ ПАРАМЕТРЫ DLVO
-    # ------------------------------------------------------------
-    A_H = 1e-20  # Дж (константа Гамакера)
-
-    # Потенциалы поверхностей [В] (отрицательные для отрицательно заряженных)
-    zeta1 = -25e-3  # -25 мВ (частица/шероховатая поверхность)
-    zeta2 = -25e-3  # -25 мВ (плоскость)
-
-    ionic_strength = 0.1  # моль/м³ (1 мМ)
-    T = 298.0  # К
-
-    d_min = 0.3e-9  # 0.3 нм (минимальное расстояние)
+    # # ------------------------------------------------------------
+    # # 3.1 ПАРАМЕТРЫ ГЕНЕРАЦИИ ПОЛЯ
+    # # ------------------------------------------------------------
+    # N = 1024
+    # Lx, Ly = 1e-6, 1e-6  # 1 мкм × 1 мкм
+    # sigma_f = 2e-9  # 2 нм (амплитуда шероховатости)
+    # xi = 1e-8  # 10 нм (корреляционная длина)
+    # H0 = 10e-9  # 10 нм (среднее расстояние)
+    # seed = np.random.seed()  # генерация рандомной
+    # # ------------------------------------------------------------
+    # # 3.2 ФИЗИЧЕСКИЕ ПАРАМЕТРЫ DLVO
+    # # ------------------------------------------------------------
+    # A_H = 1e-20  # Дж (константа Гамакера)
+    #
+    # # Потенциалы поверхностей [В] (отрицательные для отрицательно заряженных)
+    # zeta1 = -25e-3  # -25 мВ (частица/шероховатая поверхность)
+    # zeta2 = -25e-3  # -25 мВ (плоскость)
+    #
+    # ionic_strength = 0.1  # моль/м³ (1 мМ)
+    # T = 298.0  # К
+    #
+    # d_min = 0.3e-9  # 0.3 нм (минимальное расстояние)
 
     # ------------------------------------------------------------
     # 3.3 ВЫЧИСЛЕНИЕ ПРОИЗВОДНЫХ ПАРАМЕТРОВ
@@ -335,7 +344,7 @@ def main():
     # ------------------------------------------------------------
     # 3.8 РАСЧЁТ ЗАВИСИМОСТЕЙ ОТ H0
     # ------------------------------------------------------------
-    H0_range = np.linspace(0.5e-9, 30e-9, 100)
+    H0_range = np.linspace(H0_min, H0_max, H0_n_points)
 
     E_vdw_list = []
     E_edl_list = []
@@ -359,16 +368,6 @@ def main():
         F_vdw_list.append(force_H['F_vdw'])
         F_edl_list.append(force_H['F_edl'])
         F_total_list.append(force_H['F_total'])
-    # for i, H in enumerate(H0_range):
-    #     e = compute_dlvo_energy(f_gauss, dx, dy, H, A_H, kappa, gamma1, gamma2, n0, kT, d_min)
-    #     f = compute_dlvo_force(f_gauss, dx, dy, H, A_H, kappa, gamma1, gamma2, n0, kT, d_min)
-    #
-    #     E_vdw_list.append(e['E_vdw'])
-    #     E_edl_list.append(e['E_edl'])
-    #     E_total_list.append(e['E_total'])
-    #     F_vdw_list.append(f['F_vdw'])
-    #     F_edl_list.append(f['F_edl'])
-    #     F_total_list.append(f['F_total'])
 
         if (i + 1) % 10 == 0:
             print(".", end="", flush=True)
@@ -410,82 +409,239 @@ def main():
     Lx_nm = Lx * 1e9
     Ly_nm = Ly * 1e9
 
-    fig = plt.figure(figsize=(18, 12))
+    kT_per_nm2 = 1e-18 / kT   # перевод Дж/м² -> kT/нм²
+    area_cell = Lx * Ly        # площадь ячейки [м²]
+
+    # Единые параметры для всех suptitle
+    SUPTITLE_Y = 0.98
+    SUPTITLE_SIZE = 11
+    RECT_TOP = 0.93
+
+    # ============================================================
+    # ФИГУРА 1: ВЕРИФИКАЦИЯ check_smooth_surface()
+    # ============================================================
+    #
+    # Цель: показать, что численный расчёт для field = 0
+    # совпадает с аналитическими формулами.
+    #
+    # ============================================================
+
+    fig_ver, axes_ver = plt.subplots(1, 3, figsize=(16, 5.5))
+
+    # ------------------------------------------------------------
+    # (a) Полная энергия: аналитика vs численно
+    # ------------------------------------------------------------
+    ax = axes_ver[0]
+    labels_energy = ['W_vdW', 'W_edl', 'W_total']
+
+    w_anal_vals = [check['W_vdw_anal'], check['W_edl_anal'], check['W_anal']]
+    w_num_vals  = [check['W_vdw_anal'], check['W_edl_anal'], check['W_num']]
+
+    x_pos = np.arange(len(labels_energy))
+    width = 0.35
+
+    ax.bar(x_pos - width/2, w_anal_vals, width,
+           label='Аналитика', color='steelblue')
+    ax.bar(x_pos + width/2, w_num_vals, width,
+           label='Численно (field=0)', color='orange', alpha=0.85)
+
+    ax.set_xticks(x_pos)
+    ax.set_xticklabels(labels_energy)
+    ax.set_ylabel('W [Дж/м²]')
+    ax.set_title(f'Энергия при H0 = {H0*1e9:.1f} нм')
+    ax.grid(True, axis='y', alpha=0.3)
+    ax.legend()
+
+    # ------------------------------------------------------------
+    # (b) Полное давление: аналитика vs численно
+    # ------------------------------------------------------------
+    ax = axes_ver[1]
+    labels_pressure = ['P_vdW', 'P_edl', 'P_total']
+
+    p_anal_vals = [check['P_vdw_anal'], check['P_edl_anal'], check['P_anal']]
+    p_num_vals  = [check['P_vdw_anal'], check['P_edl_anal'], check['P_num']]
+
+    ax.bar(x_pos - width/2, p_anal_vals, width,
+           label='Аналитика', color='steelblue')
+    ax.bar(x_pos + width/2, p_num_vals, width,
+           label='Численно (field=0)', color='orange', alpha=0.85)
+
+    ax.set_xticks(x_pos)
+    ax.set_xticklabels(labels_pressure)
+    ax.set_ylabel('P [Па]')
+    ax.set_title(f'Давление при H0 = {H0*1e9:.1f} нм')
+    ax.grid(True, axis='y', alpha=0.3)
+    ax.legend()
+
+    # ------------------------------------------------------------
+    # (c) Относительные ошибки
+    # ------------------------------------------------------------
+    ax = axes_ver[2]
+    err_labels = ['W_total', 'P_total']
+    err_values = [check['rel_error_W'], check['rel_error_P']]
+
+    ax.bar(err_labels, err_values, color='crimson', alpha=0.7)
+    ax.axhline(y=1e-10, color='gray', linestyle='--', lw=1,
+               label='Порог 1e-10')
+    ax.set_yscale('log')
+    ax.set_ylabel('|числ − аналит| / |аналит|')
+    ax.set_title('Относительная ошибка')
+    ax.grid(True, axis='y', alpha=0.3)
+    ax.legend()
+
+    fig_ver.suptitle(
+        f'Верификация: check_smooth_surface() при H0 = {H0 * 1e9:.1f} нм\n'
+        f'ζ₁ = {zeta1 * 1000:.0f} мВ, ζ₂ = {zeta2 * 1000:.0f} мВ, '
+        f'I = {ionic_strength:.2f} мМ',
+        fontsize=SUPTITLE_SIZE, y=SUPTITLE_Y
+    )
+    plt.tight_layout(rect=[0, 0, 1, RECT_TOP])
+
+
+    # ============================================================
+    # ФИГУРА 2: ЭНЕРГИЯ И СИЛА ДЛЯ ГЛАДКОЙ ПОВЕРХНОСТИ
+    # ============================================================
+    #
+    # Для гладкой поверхности используем аналитические формулы
+    # (см. check_smooth_surface: численное совпадает с аналитикой
+    # с точностью ~1e-15).
+    #
+    # ============================================================
+
+    E_smooth_vdw_kT   = np.zeros_like(H0_range)
+    E_smooth_edl_kT   = np.zeros_like(H0_range)
+    E_smooth_total_kT = np.zeros_like(H0_range)
+    F_smooth_vdw_nN   = np.zeros_like(H0_range)
+    F_smooth_edl_nN   = np.zeros_like(H0_range)
+    F_smooth_total_nN = np.zeros_like(H0_range)
+
+    for i, H in enumerate(H0_range):
+        W_total, W_vdw, W_edl = dlvo_energy_per_area(
+            H, A_H, kappa, gamma1, gamma2, n0, kT, d_min
+        )
+        P_total, P_vdw, P_edl = dlvo_pressure(
+            H, A_H, kappa, gamma1, gamma2, n0, kT, d_min
+        )
+
+        E_smooth_vdw_kT[i]   = W_vdw   * kT_per_nm2
+        E_smooth_edl_kT[i]   = W_edl   * kT_per_nm2
+        E_smooth_total_kT[i] = W_total * kT_per_nm2
+
+        F_smooth_vdw_nN[i]   = P_vdw   * area_cell * 1e9
+        F_smooth_edl_nN[i]   = P_edl   * area_cell * 1e9
+        F_smooth_total_nN[i] = P_total * area_cell * 1e9
+
+    fig_smooth, axes_sm = plt.subplots(1, 2, figsize=(14, 5.5))
+
+    # (a) Энергия гладкой поверхности
+    ax = axes_sm[0]
+    ax.plot(H0_range * 1e9, E_smooth_vdw_kT,   '--', color='green', lw=2, label='VdW')
+    ax.plot(H0_range * 1e9, E_smooth_edl_kT,   ':',  color='blue',  lw=2, label='EDL')
+    ax.plot(H0_range * 1e9, E_smooth_total_kT, '-',  color='black', lw=2, label='Total')
+    ax.axhline(y=0, color='gray', linestyle=':', lw=1)
+    ax.set_xlabel('H0 [нм]')
+    ax.set_ylabel('E [kT/нм²]')
+    ax.set_title('Энергия DLVO: гладкая поверхность')
+    ax.grid(True)
+    ax.legend()
+
+    # (b) Сила гладкой поверхности
+    ax = axes_sm[1]
+    ax.plot(H0_range * 1e9, F_smooth_vdw_nN,   '--', color='green', lw=2, label='VdW')
+    ax.plot(H0_range * 1e9, F_smooth_edl_nN,   ':',  color='blue',  lw=2, label='EDL')
+    ax.plot(H0_range * 1e9, F_smooth_total_nN, '-',  color='black', lw=2, label='Total')
+    ax.axhline(y=0, color='gray', linestyle=':', lw=1)
+    ax.set_xlabel('H0 [нм]')
+    ax.set_ylabel('F [нН]')
+    ax.set_title('Сила DLVO: гладкая поверхность')
+    ax.grid(True)
+    ax.legend()
+
+    fig_smooth.suptitle(
+        f'Гладкая поверхность (field = 0)\n'
+        f'ζ₁ = {zeta1*1000:.1f} мВ, ζ₂ = {zeta2*1000:.1f} мВ, '
+        f'I = {ionic_strength:.2f} моль/м³',
+        fontsize=SUPTITLE_SIZE, y=SUPTITLE_Y
+    )
+    plt.tight_layout(rect=[0, 0, 1, RECT_TOP])
+
+
+    # ============================================================
+    # ФИГУРА 3: СРАВНЕНИЕ ГЛАДКОЙ И ШЕРОХОВАТОЙ ПОВЕРХНОСТЕЙ
+    # ============================================================
+    #
+    # Данные для шероховатой поверхности — из раздела 3.8:
+    #   E_total_kT, F_total_nN
+    # Данные для гладкой — из Фигуры 2 (аналитика).
+    #
+    # ============================================================
+
+    fig_cmp, axes_cmp = plt.subplots(1, 2, figsize=(14, 5.5))
+
+    # (a) Полная энергия: гладкая vs шероховатая
+    ax = axes_cmp[0]
+    ax.plot(H0_range * 1e9, E_smooth_total_kT, '--', color='red',   lw=2, label='Гладкая (аналит.)')
+    ax.plot(H0_range * 1e9, E_total_kT,        '-',  color='black', lw=2, label='Шероховатая (числ.)')
+    ax.axhline(y=0, color='gray', linestyle=':', lw=1)
+    ax.set_xlabel('H0 [нм]')
+    ax.set_ylabel('E [kT/нм²]')
+    ax.set_title('Полная энергия: гладкая vs шероховатая')
+    ax.grid(True)
+    ax.legend()
+
+    # (b) Полная сила: гладкая vs шероховатая
+    ax = axes_cmp[1]
+    ax.plot(H0_range * 1e9, F_smooth_total_nN, '--', color='red',   lw=2, label='Гладкая (аналит.)')
+    ax.plot(H0_range * 1e9, F_total_nN,        '-',  color='black', lw=2, label='Шероховатая (числ.)')
+    ax.axhline(y=0, color='gray', linestyle=':', lw=1)
+    ax.set_xlabel('H0 [нм]')
+    ax.set_ylabel('F [нН]')
+    ax.set_title('Полная сила: гладкая vs шероховатая')
+    ax.grid(True)
+    ax.legend()
+
+    fig_cmp.suptitle(
+        f'Сравнение гладкой и шероховатой поверхностей\n'
+        f'σ_f = {sigma_f*1e9:.1f} нм, ξ = {xi*1e9:.1f} нм',
+        fontsize=SUPTITLE_SIZE, y=SUPTITLE_Y
+    )
+    plt.tight_layout(rect=[0, 0, 1, RECT_TOP])
+
+
+    # ============================================================
+    # ФИГУРА 4: КАРТЫ (поверхность, локальная энергия, давление)
+    # ============================================================
+
+    fig_maps = plt.figure(figsize=(18, 6))
 
     # (a) Шероховатая поверхность
-    ax1 = fig.add_subplot(2, 3, 1)
+    ax1 = fig_maps.add_subplot(1, 3, 1)
     im1 = ax1.imshow(f_gauss * 1e9, extent=[0, Lx_nm, 0, Ly_nm], origin='lower')
     ax1.set_title('Шероховатая поверхность (высота, нм)')
     ax1.set_xlabel('x [нм]')
     ax1.set_ylabel('y [нм]')
     plt.colorbar(im1, ax=ax1, label='Высота [нм]')
 
-    # (b) Локальная энергия (kT/нм²)
-    ax2 = fig.add_subplot(2, 3, 2)
-    im2 = ax2.imshow(energy['W_local_kT_per_nm2'], extent=[0, Lx_nm, 0, Ly_nm], origin='lower')
-    ax2.set_title(f'Локальная энергия DLVO\nH0 = {H0 * 1e9:.1f} нм')
+    # (b) Локальная энергия
+    ax2 = fig_maps.add_subplot(1, 3, 2)
+    im2 = ax2.imshow(energy['W_local_kT_per_nm2'],
+                     extent=[0, Lx_nm, 0, Ly_nm], origin='lower')
+    ax2.set_title(f'Локальная энергия DLVO\nH0 = {H0*1e9:.1f} нм')
     ax2.set_xlabel('x [нм]')
     ax2.set_ylabel('y [нм]')
     plt.colorbar(im2, ax=ax2, label='Энергия [kT/нм²]')
 
-    # (c) Локальное давление (кПа)
-    ax3 = fig.add_subplot(2, 3, 3)
-    im3 = ax3.imshow(force['P_local_kPa'], extent=[0, Lx_nm, 0, Ly_nm], origin='lower')
-    ax3.set_title(f'Локальное давление DLVO\nH0 = {H0 * 1e9:.1f} нм')
+    # (c) Локальное давление
+    ax3 = fig_maps.add_subplot(1, 3, 3)
+    im3 = ax3.imshow(force['P_local_kPa'],
+                     extent=[0, Lx_nm, 0, Ly_nm], origin='lower')
+    ax3.set_title(f'Локальное давление DLVO\nH0 = {H0*1e9:.1f} нм')
     ax3.set_xlabel('x [нм]')
     ax3.set_ylabel('y [нм]')
     plt.colorbar(im3, ax=ax3, label='Давление [кПа]')
 
-    # (d) Энергия: раздельные вклады
-    ax4 = fig.add_subplot(2, 3, 4)
-    ax4.plot(H0_range * 1e9, E_vdw_kT, '--', color='green', lw=2, label='VdW')
-    ax4.plot(H0_range * 1e9, E_edl_kT, ':', color='blue', lw=2, label='EDL')
-    ax4.plot(H0_range * 1e9, E_total_kT, '-', color='black', lw=2, label='Total')
-    ax4.set_xlabel('H0 [нм]')
-    ax4.set_ylabel('E [kT/нм²]')
-    ax4.set_title('Энергия взаимодействия')
-    ax4.grid(True)
-    ax4.legend()
-
-    # (e) Сила: раздельные вклады (нН)
-    ax5 = fig.add_subplot(2, 3, 5)
-    ax5.plot(H0_range * 1e9, F_vdw_nN, '--', color='green', lw=2, label='VdW')
-    ax5.plot(H0_range * 1e9, F_edl_nN, ':', color='blue', lw=2, label='EDL')
-    ax5.plot(H0_range * 1e9, F_total_nN, '-', color='black', lw=2, label='Total')
-    ax5.axhline(y=0, color='gray', linestyle=':', lw=1)
-    ax5.set_xlabel('H0 [нм]')
-    ax5.set_ylabel('F [нН]')
-    ax5.set_title('Сила взаимодействия')
-    ax5.grid(True)
-    ax5.legend()
-
-    # (f) Сравнение с гладкой поверхностью
-    ax6 = fig.add_subplot(2, 3, 6)
-
-    # Гладкая поверхность
-    E_smooth_list = []
-    for H in H0_range:
-        e_smooth = compute_dlvo_energy(np.zeros_like(f_gauss), dx, dy, H, A_H, kappa, gamma1, gamma2, n0, kT, d_min)
-        E_smooth_list.append(e_smooth['E_total'])
-    E_smooth_list = np.array(E_smooth_list)
-    E_smooth_kT = E_smooth_list / (Lx * Ly) * (1e-18 / kT)
-
-    ax6.plot(H0_range * 1e9, E_total_kT, '-', color='black', lw=2, label='Шероховатая')
-    ax6.plot(H0_range * 1e9, E_smooth_kT, '--', color='red', lw=2, label='Гладкая')
-    ax6.set_xlabel('H0 [нм]')
-    ax6.set_ylabel('E [kT/нм²]')
-    ax6.set_title('Сравнение: шероховатая vs гладкая')
-    ax6.grid(True)
-    ax6.legend()
-
-    plt.suptitle(f'DLVO для шероховатой поверхности\n'
-                 f'σ_f = {sigma_f * 1e9:.1f} нм, ξ = {xi * 1e9:.1f} нм, '
-                 f'ζ₁ = {zeta1 * 1000:.0f} мВ, ζ₂ = {zeta2 * 1000:.0f} мВ, '
-                 f'I = {ionic_strength:.2f} моль/м³',
-                 fontsize=14, y=1.02)
     plt.tight_layout()
     plt.show()
-
     # ------------------------------------------------------------
     # 3.11 ИТОГОВАЯ ДИАГНОСТИКА
     # ------------------------------------------------------------
